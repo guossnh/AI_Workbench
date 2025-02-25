@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件管理 - AI运营工作台</title>
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            padding: 20px;
+            text-align: center;
+            background-color: #f8f9fa;
+            cursor: pointer;
+        }
+        .upload-area:hover {
+            border-color: #0d6efd;
+            background-color: #f1f3f5;
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+    </style>
+</head>
+<body>
+    <div class="toast-container"></div>
+    <div class="container mt-4">
+        <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/">AI运营工作台</a>
+                <div class="collapse navbar-collapse">
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/">数据查看</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/manage">文件管理</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card mb-4">
+                    <div class="card-header">文件上传</div>
+                    <div class="card-body">
+                        <div class="upload-area" id="uploadArea">
+                            <p class="mb-0">点击或拖拽CSV文件到此处上传</p>
+                            <input type="file" id="fileInput" accept=".csv" style="display: none">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">文件列表</div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>文件名</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fileList"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 显示提示的函数
+        function showToast(message, type = 'error') {
+            const toastContainer = document.querySelector('.toast-container');
+            const toastElement = document.createElement('div');
+            toastElement.className = `toast align-items-center ${type === 'error' ? 'text-white bg-danger' : 'text-white bg-success'}`;
+            toastElement.setAttribute('role', 'alert');
+            toastElement.setAttribute('aria-live', 'assertive');
+            toastElement.setAttribute('aria-atomic', 'true');
+            
+            toastElement.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="关闭"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toastElement);
+            const toast = new bootstrap.Toast(toastElement, {
+                animation: true,
+                autohide: true,
+                delay: 3000
+            });
+            toast.show();
+            
+            toastElement.addEventListener('hidden.bs.toast', () => {
+                toastElement.remove();
+            });
+        }
+
+        // 文件上传处理
+        function handleFileUpload(file) {
+            if (!file.name.endsWith('.csv')) {
+                showToast('请上传CSV文件');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    loadFileList();
+                    showToast('文件上传成功！', 'success');
+                } else {
+                    showToast('上传失败：' + result.error);
+                }
+            })
+            .catch(error => showToast('上传失败：' + error));
+        }
+
+        // 加载文件列表
+        function loadFileList() {
+            fetch('/api/files')
+                .then(response => response.json())
+                .then(files => {
+                    const fileList = document.getElementById('fileList');
+                    fileList.innerHTML = '';
+                    
+                    files.forEach(file => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${file}</td>
+                            <td>
+                                <button class="btn btn-danger btn-sm" onclick="deleteFile('${file}')">删除</button>
+                            </td>
+                        `;
+                        fileList.appendChild(row);
+                    });
+                });
+        }
+
+        // 删除文件
+        function deleteFile(filename) {
+            if (!confirm(`确定要删除文件 ${filename} 吗？`)) return;
+
+            fetch(`/api/files/${filename}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    loadFileList();
+                } else {
+                    alert('删除失败：' + result.error);
+                }
+            })
+            .catch(error => alert('删除失败：' + error));
+        }
+
+        // 初始加载文件列表
+        loadFileList();
+    </script>
+</body>
+</html>

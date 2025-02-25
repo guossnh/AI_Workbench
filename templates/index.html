@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI运营工作台</title>
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .image-preview {
+            max-height: 800px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0,0,0,0.3) transparent;
+        }
+        .image-preview::-webkit-scrollbar {
+            width: 6px;
+        }
+        .image-preview::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .image-preview::-webkit-scrollbar-thumb {
+            background-color: rgba(0,0,0,0.3);
+            border-radius: 3px;
+        }
+        .image-preview img {
+            width: 100%;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .loading-spinner {
+            width: 3rem;
+            height: 3rem;
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+    </style>
+</head>
+<body>
+    <div class="toast-container"></div>
+    <div class="container-fluid mt-4">
+        <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/">AI运营工作台</a>
+                <div class="collapse navbar-collapse">
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/">数据查看</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/manage">文件管理</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <div class="row">
+            <div class="col-md-2">
+                <div class="card">
+                    <div class="card-header">产品列表</div>
+                    <div class="card-body">
+                        <div class="list-group" id="fileList"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">产品场景列表</div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="contentTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 60%">产品场景</th>
+                                        <th style="width: 40%">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">图片预览</div>
+                    <div class="card-body image-preview" id="imagePreview">
+                        <div class="text-center text-muted">
+                            <p>点击场景列表中的"生成图片"按钮来预览AI生成的场景图片</p>
+                        </div>
+                        <div id="loading" class="loading">
+                            <div class="spinner-border loading-spinner" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                            <p class="mt-2">正在生成图片，请稍候...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 加载文件列表
+        function loadFiles() {
+            fetch('/api/files')
+                .then(response => response.json())
+                .then(files => {
+                    const fileList = document.getElementById('fileList');
+                    fileList.innerHTML = '';
+                    files.forEach(file => {
+                        const item = document.createElement('a');
+                        item.href = '#';
+                        item.className = 'list-group-item list-group-item-action';
+                        item.textContent = file.replace('.csv', '');
+                        item.onclick = (e) => {
+                            e.preventDefault();
+                            loadFileContent(file);
+                            document.querySelectorAll('#fileList a').forEach(a => a.classList.remove('active'));
+                            item.classList.add('active');
+                        };
+                        fileList.appendChild(item);
+                    });
+                    if (files.length > 0) {
+                        fileList.firstChild.click();
+                    }
+                });
+        }
+
+        // 加载文件内容
+        function loadFileContent(filename) {
+            fetch(`/api/file/${filename}`)
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        const tbody = document.querySelector('#contentTable tbody');
+                        tbody.innerHTML = '';
+                        result.data.forEach(row => {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td>${row.description}</td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm" onclick="generateImages('${row.prompt}')">生成图片</button>
+                                </td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    }
+                });
+        }
+
+        // 生成图片
+        // 添加显示提示的函数
+        function showToast(message, type = 'error') {
+            const toastContainer = document.querySelector('.toast-container');
+            const toastElement = document.createElement('div');
+            toastElement.className = `toast align-items-center ${type === 'error' ? 'text-white bg-danger' : 'text-white bg-success'}`;
+            toastElement.setAttribute('role', 'alert');
+            toastElement.setAttribute('aria-live', 'assertive');
+            toastElement.setAttribute('aria-atomic', 'true');
+            
+            toastElement.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="关闭"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toastElement);
+            const toast = new bootstrap.Toast(toastElement, {
+                animation: true,
+                autohide: true,
+                delay: 3000
+            });
+            toast.show();
+            
+            toastElement.addEventListener('hidden.bs.toast', () => {
+                toastElement.remove();
+            });
+        }
+
+        // 修改错误处理代码
+        function generateImages(prompt) {
+            const loading = document.getElementById('loading');
+            const imagePreview = document.getElementById('imagePreview');
+            const generateButtons = document.querySelectorAll('.btn-primary');
+            
+            // 禁用所有生成按钮
+            generateButtons.forEach(button => {
+                button.disabled = true;
+            });
+            
+            Array.from(imagePreview.children).forEach(child => {
+                if (child.tagName === 'IMG') {
+                    child.remove();
+                }
+            });
+            
+            loading.style.display = 'block';
+
+            fetch('/api/generate-images', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ prompt })
+            })
+            .then(response => response.json())
+            .then(result => {
+                loading.style.display = 'none';
+                if (result.success) {
+                    result.images.forEach(imagePath => {
+                        const container = document.createElement('div');
+                        container.className = 'image-container';
+                        
+                        const img = document.createElement('img');
+                        img.src = imagePath;
+                        img.alt = prompt;
+                        img.className = 'img-fluid';
+                        
+                        const downloadBtn = document.createElement('button');
+                        downloadBtn.className = 'btn btn-primary btn-sm download-btn';
+                        downloadBtn.innerHTML = '<i class="bi bi-download"></i> 下载';
+                        downloadBtn.onclick = () => {
+                            const link = document.createElement('a');
+                            link.href = imagePath;
+                            link.download = prompt + '_' + imagePath.split('_').pop();
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        };
+                        
+                        container.appendChild(img);
+                        container.appendChild(downloadBtn);
+                        imagePreview.insertBefore(container, loading);
+                    });
+                    showToast('图片生成成功！', 'success');
+                } else {
+                    showToast(result.error || '生成图片失败');
+                }
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                showToast('生成图片失败：' + error.message);
+            })
+            .finally(() => {
+                // 启用所有生成按钮
+                generateButtons.forEach(button => {
+                    button.disabled = false;
+                });
+            });
+        }
+
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', loadFiles);
+    </script>
+</body>
+</html>
+<style>
+    .image-container {
+        position: relative;
+        margin-bottom: 1rem;
+    }
+    .download-btn {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        z-index: 10;
+        opacity: 0.8;
+    }
+    .download-btn:hover {
+        opacity: 1;
+    }
+</style>
+</body>
+</html>
