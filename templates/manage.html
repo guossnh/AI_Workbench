@@ -4,7 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>文件管理 - AI运营工作台</title>
-    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?a384a0604850d6cf794daf39824b3727";
+      var s = document.getElementsByTagName("script")[0]; 
+      s.parentNode.insertBefore(hm, s);
+    })();
+    </script>
     <style>
         .upload-area {
             border: 2px dashed #ccc;
@@ -18,16 +27,9 @@
             border-color: #0d6efd;
             background-color: #f1f3f5;
         }
-        .toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1050;
-        }
     </style>
 </head>
 <body>
-    <div class="toast-container"></div>
     <div class="container mt-4">
         <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
             <div class="container-fluid">
@@ -77,43 +79,35 @@
         </div>
     </div>
 
-    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script>
-        // 显示提示的函数
-        function showToast(message, type = 'error') {
-            const toastContainer = document.querySelector('.toast-container');
-            const toastElement = document.createElement('div');
-            toastElement.className = `toast align-items-center ${type === 'error' ? 'text-white bg-danger' : 'text-white bg-success'}`;
-            toastElement.setAttribute('role', 'alert');
-            toastElement.setAttribute('aria-live', 'assertive');
-            toastElement.setAttribute('aria-atomic', 'true');
-            
-            toastElement.innerHTML = `
-                <div class="d-flex">
-                    <div class="toast-body">
-                        ${message}
-                    </div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="关闭"></button>
-                </div>
-            `;
-            
-            toastContainer.appendChild(toastElement);
-            const toast = new bootstrap.Toast(toastElement, {
-                animation: true,
-                autohide: true,
-                delay: 3000
-            });
-            toast.show();
-            
-            toastElement.addEventListener('hidden.bs.toast', () => {
-                toastElement.remove();
-            });
-        }
+        // 文件上传区域交互
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#0d6efd';
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = '#ccc';
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ccc';
+            const files = e.dataTransfer.files;
+            if (files.length > 0) handleFileUpload(files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFileUpload(e.target.files[0]);
+        });
 
         // 文件上传处理
         function handleFileUpload(file) {
             if (!file.name.endsWith('.csv')) {
-                showToast('请上传CSV文件');
+                alert('请上传CSV文件');
                 return;
             }
 
@@ -128,12 +122,11 @@
             .then(result => {
                 if (result.success) {
                     loadFileList();
-                    showToast('文件上传成功！', 'success');
                 } else {
-                    showToast('上传失败：' + result.error);
+                    alert('上传失败：' + result.error);
                 }
             })
-            .catch(error => showToast('上传失败：' + error));
+            .catch(error => alert('上传失败：' + error));
         }
 
         // 加载文件列表

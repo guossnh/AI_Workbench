@@ -51,11 +51,11 @@ def get_file_content(filename):
         for encoding in encodings:
             try:
                 df = pd.read_csv(file_path, encoding=encoding)
-                # 确保数据至少有两列
-                if len(df.columns) < 2:
+                # 确保数据至少有一列
+                if len(df.columns) < 1:
                     return jsonify({
                         'success': False,
-                        'error': 'CSV文件必须包含至少两列：场景描述和英文提示词'
+                        'error': 'CSV文件必须包含至少一列：场景描述'
                     })
                 # 使用第一列数据作为场景描述和提示词
                 data = [{
@@ -173,7 +173,7 @@ def generate_images():
             "ddim_steps": 25,
             "width": 512,
             "height": 512,
-            "use_pre_llm": True,
+            "use_pre_llm": data.get('usePreLlm', True),
             "use_sr": True,
             "sr_seed": -1,
             "sr_strength": 0.4,
